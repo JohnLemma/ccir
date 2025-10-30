@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BomItem } from '../types';
 import { exportToExcel, exportToPdf } from '../services/exportService';
 
@@ -7,6 +7,8 @@ interface BomTableProps {
 }
 
 const BomTable: React.FC<BomTableProps> = ({ bomData }) => {
+  const [copyButtonText, setCopyButtonText] = useState('Copy Table');
+
   if (bomData.length === 0) {
     return (
       <div className="text-center py-10 px-4 bg-white rounded-lg shadow-md">
@@ -16,12 +18,38 @@ const BomTable: React.FC<BomTableProps> = ({ bomData }) => {
       </div>
     );
   }
+  
+  const handleCopy = () => {
+    // Create a tab-separated string for easy pasting into spreadsheets
+    const headers = ['Item', 'Description', 'Quantity', 'Unit'].join('\t');
+    const rows = bomData.map(item => 
+      [item.item, item.description, item.quantity, item.unit].join('\t')
+    ).join('\n');
+    
+    const tableString = `${headers}\n${rows}`;
+    
+    navigator.clipboard.writeText(tableString).then(() => {
+      setCopyButtonText('Copied!');
+      setTimeout(() => {
+        setCopyButtonText('Copy Table');
+      }, 2000); // Revert text after 2 seconds
+    }).catch(err => {
+      console.error('Failed to copy table: ', err);
+      alert('Failed to copy table to clipboard.');
+    });
+  };
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
         <h2 className="text-2xl font-bold text-brand-green">Bill of Materials</h2>
-        <div className="flex space-x-2">
+        <div className="flex items-center space-x-2">
+           <button
+            onClick={handleCopy}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-all duration-200"
+          >
+            {copyButtonText}
+          </button>
           <button
             onClick={() => exportToPdf(bomData)}
             className="px-4 py-2 text-sm font-medium text-white bg-brand-orange rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"

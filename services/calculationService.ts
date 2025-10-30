@@ -1,5 +1,5 @@
 import { Motor, BoardOptions, BomItem, StarterType, OverloadData, CableData, ContactorData } from '../types';
-import { IFL_PER_KW, BREAKER_SIZES, OVERLOAD_RELAY_DATA, CABLE_AMPACITY_DATA, CONTACTOR_SIZES } from '../constants';
+import { IFL_PER_KW, BREAKER_SIZES, OVERLOAD_RELAY_DATA, CABLE_AMPACITY_DATA, CONTACTOR_SIZES, POWER_TERMINAL_SIZES } from '../constants';
 
 const calculateIfl = (kw: number): number => (kw / 0.88) * IFL_PER_KW;
 
@@ -24,6 +24,10 @@ const selectCable = (amps: number): CableData => {
 
   return selected;
 };
+
+const selectTerminal = (amps: number): number => {
+    return POWER_TERMINAL_SIZES.find(size => size >= amps) || POWER_TERMINAL_SIZES[POWER_TERMINAL_SIZES.length - 1];
+}
 
 class BomAggregator {
   private bomMap: Map<string, BomItem> = new Map();
@@ -58,23 +62,27 @@ export const generateBom = (motors: Motor[], boardOptions: BoardOptions): BomIte
       const starContactorAmps = ifl * 0.33;
       const mainDeltaContactor = selectContactor(mainContactorAmps);
       const starContactor = selectContactor(starContactorAmps);
+      
+      const mainDeltaDesc = `Ith ${mainDeltaContactor.ac1}A (D${mainDeltaContactor.ac3})`;
+      const starDesc = `Ith ${starContactor.ac1}A (D${starContactor.ac3})`;
 
-      bom.add('Contactor (Main/Delta)', `AC-3: ${mainDeltaContactor.ac3}A / AC-1: ${mainDeltaContactor.ac1}A`, 2, 'pcs');
-      bom.add('Contactor (Star)', `AC-3: ${starContactor.ac3}A / AC-1: ${starContactor.ac1}A`, 1, 'pcs');
+      bom.add('Contactor (Main/Delta)', mainDeltaDesc, 2, 'pcs');
+      bom.add('Contactor (Star)', starDesc, 1, 'pcs');
       
       const overloadAmps = ifl * 0.58;
       const selectedOverload = selectOverload(overloadAmps);
-      bom.add('Overload Relay', `Range: ${selectedOverload.range}A (${selectedOverload.ref})`, 1, 'pcs');
+      bom.add('Overload Relay', `${selectedOverload.range}A`, 1, 'pcs');
       bom.add('Timer', 'Star-Delta', 1, 'pcs');
 
     } else { // DOL or ForwardReverse
       const contactorQty = motor.starterType === 'ForwardReverse' ? 2 : 1;
       const selectedContactor = selectContactor(ifl);
       const contactorItem = motor.starterType === 'ForwardReverse' ? 'Contactor (Fwd/Rev)' : 'Contactor (DOL)';
-      bom.add(contactorItem, `AC-3: ${selectedContactor.ac3}A / AC-1: ${selectedContactor.ac1}A`, contactorQty, 'pcs');
+      const contactorDesc = `Ith ${selectedContactor.ac1}A (D${selectedContactor.ac3})`;
+      bom.add(contactorItem, contactorDesc, contactorQty, 'pcs');
 
       const selectedOverload = selectOverload(ifl);
-      bom.add('Overload Relay', `Range: ${selectedOverload.range}A (${selectedOverload.ref})`, 1, 'pcs');
+      bom.add('Overload Relay', `${selectedOverload.range}A`, 1, 'pcs');
     }
     
     if (motor.starterType === 'ForwardReverse') {
@@ -85,9 +93,11 @@ export const generateBom = (motors: Motor[], boardOptions: BoardOptions): BomIte
     }
 
     if (motor.starterType === 'StarDelta') {
-        bom.add('Power Terminals', `Rated >= ${(ifl * 0.58 * 1.25).toFixed(2)}A`, 6, 'pcs');
+        const terminalRating = selectTerminal(ifl * 0.58 * 1.25);
+        bom.add('Power Terminals', `${terminalRating}A`, 6, 'pcs');
     } else {
-        bom.add('Power Terminals', `Rated >= ${(ifl * 1.25).toFixed(2)}A`, 3, 'pcs');
+        const terminalRating = selectTerminal(ifl * 1.25);
+        bom.add('Power Terminals', `${terminalRating}A`, 3, 'pcs');
     }
 
     if (motor.starterType === 'StarDelta') {
@@ -126,7 +136,8 @@ export const generateBom = (motors: Motor[], boardOptions: BoardOptions): BomIte
     bom.add('Control Breaker', '16A, Single Phase', 1, 'pcs');
     bom.add('Phase Sequence Relay', '380V', 1, 'pcs');
     bom.add('Selector Switch', 'Auto/Manual', 1, 'pcs');
-    bom.add('Main Power Terminals', `Rated >= ${(totalIfl * 1.25).toFixed(2)}A`, 4, 'pcs');
+    const mainTerminalRating = selectTerminal(totalIfl * 1.25);
+    bom.add('Main Power Terminals', `${mainTerminalRating}A`, 4, 'pcs');
   }
 
   if (boardOptions.has3PhaseIndicator) {
