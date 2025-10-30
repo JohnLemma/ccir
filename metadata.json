@@ -1,0 +1,5 @@
+{
+  "name": "Industrial Electrical Board BOM Generator",
+  "description": "An application for electrical engineers to generate a Bill of Materials (BOM) for industrial motor control panels. Users can specify the number of motors, their power ratings, and control features to receive a detailed list of required components, including breakers, contactors, cables, and accessories, with an option to export the list.",
+  "requestFramePermissions": []
+}
